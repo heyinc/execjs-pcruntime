@@ -19,13 +19,15 @@ module ExecJS
           @runtime = runtime.create_runtime_handle
 
           # Test compile context source
-          eval(source.encode('UTF-8'))
+
+          @runtime.evaluate(source.encode('UTF-8'))
         end
 
         def eval(source, options = {})
           # puts "[#{__FILE__}:#{__LINE__}] Context::eval"
-
-          @runtime.evaluate(source.encode('UTF-8'))
+          if /\S/ =~ source
+            @runtime.evaluate("(#{source.encode('UTF-8')})")
+          end
         end
 
         def exec(source, options = {})
@@ -69,7 +71,7 @@ module ExecJS
         # @param [String] binary node(またはそれに準ずるJavaScriptランタイム)バイナリのパス
         # @param [String] initial_source 初期状態で読み込ませるJavaScriptソースコードのパス
         def initialize(binary, initial_source)
-          Dir::Tmpname.create "my_execjs_runtime" do |path|
+          Dir::Tmpname.create "execjs_pcruntime" do |path|
             @process = Process.spawn({ "PORT" => path }, binary, initial_source)
 
             retries = 20
@@ -122,7 +124,6 @@ module ExecJS
         # thread-localなsocketを返す
         # @return [Net::BufferedIO]
         def get_socket
-          # Thread.current["socket#{@socket_path}"] ||=
           Net::BufferedIO.new(UNIXSocket.new(@socket_path))
         end
 
@@ -157,10 +158,14 @@ module ExecJS
             response = Net::HTTPResponse.read_new(socket)
           end while response.kind_of?(Net::HTTPContinue)
           response.reading_body(socket, request.response_body_permitted?) {}
-          begin
-            ::JSON.parse(response.body, create_additions: false)
-          rescue
-            nil
+          if response.code == "200"
+            result = response.body
+            if /\S/ =~ result
+              ::JSON.parse(response.body, create_additions: false)
+            end
+          else
+            # TODO: SyntaxErrorとのエラー分岐とバックトレースの挿入が要る
+            raise ExecJS::ProgramError
           end
         end
       end
