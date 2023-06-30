@@ -2,6 +2,8 @@
 require "execjs/runtime"
 require "tmpdir"
 require "json"
+require "net/protocol"
+require "net/http"
 
 module ExecJS
   module PCRuntime
