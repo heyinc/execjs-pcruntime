@@ -201,15 +201,16 @@ module ExecJS
       def which(commands)
         extensions = ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [""] : [""]
         search_set = (ENV['PATH'].split(File::PATH_SEPARATOR) + [""])
-                   .flat_map { |base_path| extensions.map { |ext| [base_path, ext] } }
+                     .flat_map { |base_path| extensions.map { |ext| [base_path, ext] } }
+        regex = /([^\s"']+)|"([^"]+)"|'([^']+)'(?:\s+|\s*\Z)/
         commands.each do |command|
-          command, *args = command.split /\s+/
+          command_item = []
+          command.scan(regex) { |match| command_item << Array(match).flatten.find { |c| c } }
+          command, *args = command_item
           commands = search_set.filter_map do |setting|
             base_path, extension = setting
-            executable_path = File.join(base_path, command + extension)
-            if File.executable?(executable_path) && File.exist?(executable_path)
-              executable_path
-            end
+            executable_path = base_path != "" ? File.join(base_path, command + extension) : command + extension
+            File.executable?(executable_path) && File.exist?(executable_path) ? executable_path : nil
           end
           command = commands.first
           return [command] + args unless command.nil?
