@@ -39,7 +39,7 @@ module ExecJS
         def call(identifier, *args)
           # puts "[#{__FILE__}:#{__LINE__}] Context::call"
 
-          @runtime.evaluate("#{identifier}.apply(this, #{::JSON.generate(args)})")
+          @runtime.evaluate("(#{identifier}).apply(this, #{::JSON.generate(args)})")
         end
 
         protected
@@ -164,8 +164,11 @@ module ExecJS
               ::JSON.parse(response.body, create_additions: false)
             end
           else
-            # TODO: SyntaxErrorとのエラー分岐とバックトレースの挿入が要る
-            raise ExecJS::ProgramError
+            message, stack = response.body.split "\0"
+            error_class = message =~ /SyntaxError:/ ? RuntimeError : ProgramError
+            error = error_class.new(message)
+            error.set_backtrace(stack)
+            raise error
           end
         end
       end
