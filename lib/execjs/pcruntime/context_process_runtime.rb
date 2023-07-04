@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require "execjs/runtime"
-require "tmpdir"
-require "json"
-require "net/protocol"
-require "net/http"
+require 'execjs/runtime'
+require 'tmpdir'
+require 'json'
+require 'net/protocol'
+require 'net/http'
 
 module ExecJS
   module PCRuntime
@@ -15,7 +15,7 @@ module ExecJS
         # @param [String] runtime ContextProcessRuntimeのインスタンスを期待
         # @param [String] source 起動時に読み込むJavaScriptソース
         # @param [any] options
-        def initialize(runtime, source = "", options = {})
+        def initialize(runtime, source = '', options = {})
           super(runtime, source, options)
 
           # @type [JSRuntimeHandle]
@@ -28,16 +28,16 @@ module ExecJS
         # override ExecJS::Runtime::Context#eval
         # @param [String] source
         # @param [any] options
-        def eval(source, options = {})
-          if /\S/ =~ source
-            @runtime.evaluate("(#{source.encode('UTF-8')})")
-          end
+        def eval(source, _options = {})
+          return unless /\S/ =~ source
+
+          @runtime.evaluate("(#{source.encode('UTF-8')})")
         end
 
         # override ExecJS::Runtime::Context#exec
         # @param [String] source
         # @param [any] options
-        def exec(source, options = {})
+        def exec(source, _options = {})
           @runtime.evaluate("(()=>{#{source.encode('UTF-8')}})()")
         end
 
@@ -55,20 +55,20 @@ module ExecJS
         # @param [Array<String>] binary node(またはそれに準ずるJavaScriptランタイム)バイナリの起動コマンド ["node"] ["deno", "run"]など
         # @param [String] initial_source 初期状態で読み込ませるJavaScriptソースコードのパス
         def initialize(binary, initial_source)
-          Dir::Tmpname.create "execjs_pcruntime" do |path|
-            @runtime_pid = Process.spawn({ "PORT" => path }, *binary, initial_source)
+          Dir::Tmpname.create 'execjs_pcruntime' do |path|
+            @runtime_pid = Process.spawn({ 'PORT' => path }, *binary, initial_source)
 
             retries = 20
             until File.exist?(path)
               sleep 0.05
               retries -= 1
 
-              if retries <= 0
-                begin
-                  Process.kill(:KILL, @runtime_pid)
-                ensure
-                  raise Errno::EEXIST
-                end
+              next unless retries <= 0
+
+              begin
+                Process.kill(:KILL, @runtime_pid)
+              ensure
+                raise Errno::EEXIST
               end
             end
 
@@ -76,8 +76,8 @@ module ExecJS
 
             begin
               # nodejsの起動に失敗しているとここでエラーが出るため、Dir::Tmpname.createに渡したブロック全体が再実行される
-              post_request("/")
-            rescue
+              post_request('/')
+            rescue StandardError
               begin
                 Process.kill(:KILL, @runtime_pid)
               ensure
@@ -93,7 +93,7 @@ module ExecJS
         # @param [String] source JavaScriptソース
         # @return [object]
         def evaluate(source)
-          post_request("/eval", "text/javascript", source)
+          post_request('/eval', 'text/javascript', source)
         end
 
         private
@@ -101,11 +101,11 @@ module ExecJS
         # 指定IDのプロセスをkillするprocedureを返す
         # JSRuntimeHandleのfinalizerとして使う
         # @param [Integer] pid
-        def JSRuntimeHandle.finalizer(pid)
+        def self.finalizer(pid)
           proc do
             Process.kill(:KILL, pid)
-          rescue => e
-            STDERR.puts e
+          rescue StandardError => e
+            warn e
           end
         end
 
@@ -129,20 +129,20 @@ module ExecJS
 
           request = Net::HTTP::Post.new(path)
           request['Connection'] = 'close'
-          if content_type != nil
+          unless content_type.nil?
             request['Content-Type'] = content_type
             request.body = body
           end
 
           # Net::HTTPGenericRequest#exec internal use onlyとマークされているので使いたくない 代替案はNet::HTTP#requestのoverride(めんどいので保留)
-          request.exec(socket, "1.1", path)
+          request.exec(socket, '1.1', path)
 
           begin
             response = Net::HTTPResponse.read_new(socket)
-          end while response.kind_of?(Net::HTTPContinue)
+          end while response.is_a?(Net::HTTPContinue)
           response.reading_body(socket, request.response_body_permitted?) {}
 
-          if response.code == "200"
+          if response.code == '200'
             result = response.body
             if /\S/ =~ result
               ::JSON.parse(response.body, create_additions: false)
@@ -162,7 +162,7 @@ module ExecJS
       # @param [String] name ランタイムの名称
       # @param [Array<String>] command JavaScriptランタイムのコマンド候補 ["deno run", "node"] など
       # @param [String] runner_path JavaScriptランタイムで実行するjsファイルのパス
-      def initialize(name, command, runner_path = File.expand_path('../runner.js', __FILE__), deprecated = false)
+      def initialize(name, command, runner_path = File.expand_path('runner.js', __dir__), deprecated = false)
         super()
         @name = name
         @command = command
@@ -200,8 +200,8 @@ module ExecJS
       # @param [Array<String>] commands コマンドの候補 ["deno run", "node"] など
       # @return [Array<String>] コマンドの絶対パスとコマンドライン引数 ["deno", "run"] など
       def which(commands)
-        extensions = ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [""] : [""]
-        search_set = (ENV['PATH'].split(File::PATH_SEPARATOR) + [""])
+        extensions = ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [''] : ['']
+        search_set = (ENV['PATH'].split(File::PATH_SEPARATOR) + [''])
                      .flat_map { |base_path| extensions.map { |ext| [base_path, ext] } }
         regex = /([^\s"']+)|"([^"]+)"|'([^']+)'(?:\s+|\s*\Z)/
         commands.each do |command|
@@ -210,7 +210,7 @@ module ExecJS
           command, *args = command_item
           commands = search_set.filter_map do |setting|
             base_path, extension = setting
-            executable_path = base_path != "" ? File.join(base_path, command + extension) : command + extension
+            executable_path = base_path != '' ? File.join(base_path, command + extension) : command + extension
             File.executable?(executable_path) && File.exist?(executable_path) ? executable_path : nil
           end
           command = commands.first

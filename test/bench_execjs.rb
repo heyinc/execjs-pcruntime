@@ -26,7 +26,7 @@ require 'benchmark'
 require 'execjs'
 
 TIMES = 10
-SOURCE = File.read(File.expand_path("../fixtures/coffee-script.js", __FILE__)).freeze
+SOURCE = File.read(File.expand_path('fixtures/coffee-script.js', __dir__)).freeze
 
 Benchmark.bmbm do |x|
   ExecJS::Runtimes.runtimes.each do |runtime|
@@ -37,7 +37,7 @@ Benchmark.bmbm do |x|
       context = ExecJS.compile(SOURCE)
 
       TIMES.times do
-        context.call("CoffeeScript.eval", "((x) -> x * x)(8)")
+        context.call('CoffeeScript.eval', '((x) -> x * x)(8)')
       end
     end
   end
