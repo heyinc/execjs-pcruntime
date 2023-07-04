@@ -119,8 +119,8 @@ class TestExecJS < Test
     "[1, function() {}]" => [1, nil],
     "'hello'" => "hello",
     "'red yellow blue'.split(' ')" => ["red", "yellow", "blue"],
-    "{a:1,b:2}" => {"a"=>1,"b"=>2},
-    "{a:true,b:function (){}}" => {"a"=>true},
+    "{a:1,b:2}" => { "a" => 1, "b" => 2 },
+    "{a:true,b:function (){}}" => { "a" => true },
     "'café'" => "café",
     '"☃"' => "☃",
     '"\u2603"' => "☃",
@@ -163,8 +163,8 @@ class TestExecJS < Test
     [1, [2, 3]],
     [1, [2, [3]]],
     ["red", "yellow", "blue"],
-    { "a" => 1, "b" => 2},
-    { "a" => 1, "b" => [2, 3]},
+    { "a" => 1, "b" => 2 },
+    { "a" => 1, "b" => [2, 3] },
     { "a" => true }
   ].each_with_index do |value, index|
     json_value = JSON.generate(value, quirks_mode: true)
@@ -449,16 +449,16 @@ class TestExecJS < Test
     JS
     context = ExecJS.compile(source)
     assert_equal "function foo(bar){return bar}",
-      context.call("uglify", "function foo(bar) {\n  return bar;\n}")
+                 context.call("uglify", "function foo(bar) {\n  return bar;\n}")
   end
 
   private
 
-    def assert_output(expected, actual)
-      if expected.nil?
-        assert_nil actual
-      else
-        assert_equal expected, actual
-      end
+  def assert_output(expected, actual)
+    if expected.nil?
+      assert_nil actual
+    else
+      assert_equal expected, actual
     end
+  end
 end
