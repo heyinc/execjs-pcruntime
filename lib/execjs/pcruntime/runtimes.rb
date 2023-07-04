@@ -7,9 +7,8 @@ require "execjs/runtimes"
 module ExecJS
   module Runtimes
     PCRuntime = PCRuntime::ContextProcessRuntime.new(
-      name:        "Node.js (V8) fast",
-      command:     ["nodejs", "node"],
-      runner_path: File.expand_path('../runner.js', __FILE__),
+      "Node.js (V8) Process as Context",
+      ["nodejs", "node"],
     )
 
     runtimes.unshift(PCRuntime)
