@@ -123,7 +123,7 @@ module ExecJS
         end
 
         # JavaScriptランタイムにリクエストを送る
-        # @param [String] socket_path TODO
+        # @param [String] socket_path UNIXドメインソケットのパス
         # @param [String] path HTTPリクエスト時のPath("/eval"など)
         # @param [String?] content_type bodyのContent-type
         # @param [String] body HTTPリクエストのbody
