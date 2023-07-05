@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Copied from https://github.com/rails/execjs/blob/v2.8.1/test/test_execjs.rb
 # Released under MIT License
 #
@@ -39,10 +41,11 @@ elsif defined? MiniTest::Unit::TestCase
   Test = MiniTest::Unit::TestCase
 end
 
+# rubocop:disable Metrics/ClassLength,Metrics/AbcSize
 class TestExecJS < Test
   def test_runtime_available
     runtime = ExecJS::ExternalRuntime.new(command: 'nonexistent')
-    assert !runtime.available?
+    refute runtime.available?
 
     runtime = ExecJS::ExternalRuntime.new(command: 'ruby')
     assert runtime.available?
@@ -83,6 +86,7 @@ class TestExecJS < Test
     # Known bug: https://github.com/cowboyd/therubyrhino/issues/39
     skip if ExecJS.runtime.is_a?(ExecJS::RubyRhinoRuntime)
 
+    # rubocop:disable Naming/HeredocDelimiterNaming
     # Make sure that `this` is indeed the global scope
     context = ExecJS.compile(<<-EOF)
       name = 123;
@@ -95,6 +99,7 @@ class TestExecJS < Test
         return this.name;
       }
     EOF
+    # rubocop:enable Naming/HeredocDelimiterNaming
 
     assert_equal 123, context.call("(new Person('Bob')).getThis")
   end
@@ -176,7 +181,7 @@ class TestExecJS < Test
     end
 
     define_method("test_eval_value_#{index}") do
-      assert_output value, ExecJS.eval("#{json_value}")
+      assert_output value, ExecJS.eval(json_value.to_s)
     end
 
     define_method("test_strinigfy_value_#{index}") do
@@ -225,7 +230,7 @@ class TestExecJS < Test
     assert_equal utf8, result.encoding
 
     assert_raises Encoding::UndefinedConversionError do
-      binary = "\xde\xad\xbe\xef".force_encoding('BINARY')
+      binary = "\xde\xad\xbe\xef".encode('BINARY')
       ExecJS.eval(binary)
     end
   end
@@ -244,7 +249,7 @@ class TestExecJS < Test
     assert_equal utf8, result.encoding
 
     assert_raises Encoding::UndefinedConversionError do
-      binary = "\xde\xad\xbe\xef".force_encoding('BINARY')
+      binary = "\xde\xad\xbe\xef".encode('BINARY')
       context.eval(binary)
     end
   end
@@ -276,8 +281,8 @@ class TestExecJS < Test
   end
 
   def test_this_is_global_scope
-    assert_equal true, ExecJS.eval('this === (function() {return this})()')
-    assert_equal true, ExecJS.exec('return this === (function() {return this})()')
+    assert ExecJS.eval('this === (function() {return this})()')
+    assert ExecJS.exec('return this === (function() {return this})()')
   end
 
   def test_browser_self_is_undefined
@@ -339,7 +344,7 @@ class TestExecJS < Test
     flunk
   rescue ExecJS::RuntimeError => e
     assert e
-    assert e.backtrace[0].include?('(execjs):1'), e.backtrace.join("\n")
+    assert_includes e.backtrace[0], '(execjs):1', e.backtrace.join("\n")
   end
 
   def test_eval_syntax_error
@@ -347,7 +352,7 @@ class TestExecJS < Test
     flunk
   rescue ExecJS::RuntimeError => e
     assert e
-    assert e.backtrace[0].include?('(execjs):1'), e.backtrace.join("\n")
+    assert_includes e.backtrace[0], '(execjs):1', e.backtrace.join("\n")
   end
 
   def test_compile_syntax_error
@@ -355,7 +360,7 @@ class TestExecJS < Test
     flunk
   rescue ExecJS::RuntimeError => e
     assert e
-    assert e.backtrace[0].include?('(execjs):1'), e.backtrace.join("\n")
+    assert_includes e.backtrace[0], '(execjs):1', e.backtrace.join("\n")
   end
 
   def test_exec_thrown_error
@@ -363,7 +368,7 @@ class TestExecJS < Test
     flunk
   rescue ExecJS::ProgramError => e
     assert e
-    assert e.backtrace[0].include?('(execjs):1'), e.backtrace.join("\n")
+    assert_includes e.backtrace[0], '(execjs):1', e.backtrace.join("\n")
   end
 
   def test_eval_thrown_error
@@ -371,7 +376,7 @@ class TestExecJS < Test
     flunk
   rescue ExecJS::ProgramError => e
     assert e
-    assert e.backtrace[0].include?('(execjs):1'), e.backtrace.join("\n")
+    assert_includes e.backtrace[0], '(execjs):1', e.backtrace.join("\n")
   end
 
   def test_compile_thrown_error
@@ -379,7 +384,7 @@ class TestExecJS < Test
     flunk
   rescue ExecJS::ProgramError => e
     assert e
-    assert e.backtrace[0].include?('(execjs):1'), e.backtrace.join("\n")
+    assert_includes e.backtrace[0], '(execjs):1', e.backtrace.join("\n")
   end
 
   def test_exec_thrown_string
@@ -448,3 +453,4 @@ class TestExecJS < Test
     end
   end
 end
+# rubocop:enable Metrics/ClassLength,Metrics/AbcSize

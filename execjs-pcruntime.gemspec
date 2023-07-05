@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 lib = File.expand_path('lib', __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'execjs/pcruntime/version'
@@ -7,6 +9,7 @@ Gem::Specification.new do |spec|
   spec.version       = Execjs::PCRuntime::VERSION
   spec.authors       = ['White-Green']
   spec.email         = ['shintaro.otsuka@st.inc']
+  spec.required_ruby_version = '>3.0.0'
 
   spec.summary       = 'TO_DO: Write a short summary, because RubyGems requires one.'
   spec.description   = 'TO_DO: Write a longer description or delete this line.'
@@ -23,7 +26,7 @@ Gem::Specification.new do |spec|
     # spec.metadata["changelog_uri"] = "TODO: Put your gem's CHANGELOG.md URL here."
   else
     raise 'RubyGems 2.0 or newer is required to protect against ' \
-      'public gem pushes.'
+          'public gem pushes.'
   end
 
   # Specify which files should be added to the gem when it is released.
@@ -35,8 +38,9 @@ Gem::Specification.new do |spec|
   spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ['lib']
 
-  spec.add_dependency 'execjs', '~> 2.0'
-  spec.add_development_dependency 'bundler'
-  spec.add_development_dependency 'minitest', '~> 5.0'
-  spec.add_development_dependency 'rake', '~> 10.0'
+  # spec.add_dependency 'execjs', '~> 2.0'
+  # spec.add_development_dependency 'bundler'
+  # spec.add_development_dependency 'minitest', '~> 5.0'
+  # spec.add_development_dependency 'rake', '~> 10.0'
+  spec.metadata['rubygems_mfa_required'] = 'true'
 end

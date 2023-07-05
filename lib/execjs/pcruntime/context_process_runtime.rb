@@ -29,7 +29,7 @@ module ExecJS
         # @param [String] source
         # @param [any] options
         def eval(source, _options = {})
-          return unless /\S/ =~ source
+          return unless /\S/.match?(source)
 
           @runtime.evaluate("(#{source.encode('UTF-8')})")
         end
@@ -56,36 +56,44 @@ module ExecJS
         # @param [String] initial_source 初期状態で読み込ませるJavaScriptソースコードのパス
         def initialize(binary, initial_source)
           Dir::Tmpname.create 'execjs_pcruntime' do |path|
-            @runtime_pid = Process.spawn({ 'PORT' => path }, *binary, initial_source)
-
-            retries = 20
-            until File.exist?(path)
-              sleep 0.05
-              retries -= 1
-
-              next unless retries <= 0
-
-              begin
-                Process.kill(:KILL, @runtime_pid)
-              ensure
-                raise Errno::EEXIST
-              end
-            end
-
+            @runtime_pid = create_process(path, *binary, initial_source)
             @socket_path = path
-
-            begin
-              # nodejsの起動に失敗しているとここでエラーが出るため、Dir::Tmpname.createに渡したブロック全体が再実行される
-              post_request('/')
-            rescue StandardError
-              begin
-                Process.kill(:KILL, @runtime_pid)
-              ensure
-                raise Errno::EEXIST
-              end
-            end
           end
           ObjectSpace.define_finalizer(self, self.class.finalizer(@runtime_pid))
+        end
+
+        def delayed_retries(times)
+          while times.positive?
+            return true if yield
+
+            sleep 0.05
+            times -= 1
+          end
+          false
+        end
+
+        def self.kill_process(pid)
+          Process.kill(:KILL, pid)
+        rescue StandardError => e
+          e
+        end
+
+        def create_process(socket_path, *command)
+          pid = Process.spawn({ 'PORT' => socket_path }, *command)
+
+          unless delayed_retries(20) { File.exist?(socket_path) }
+            kill_process(pid)
+            raise Errno::EEXIST
+          end
+
+          begin
+            # nodejsの起動に失敗しているとここでエラーが出るため、Dir::Tmpname.createに渡したブロック全体が再実行される
+            post_request(socket_path, '/')
+          rescue StandardError
+            kill_process(pid)
+            raise Errno::EEXIST
+          end
+          pid
         end
 
         # JavaScriptコードを評価してその結果を返す
@@ -93,35 +101,37 @@ module ExecJS
         # @param [String] source JavaScriptソース
         # @return [object]
         def evaluate(source)
-          post_request('/eval', 'text/javascript', source)
+          post_request(@socket_path, '/eval', 'text/javascript', source)
         end
-
-        private
 
         # 指定IDのプロセスをkillするprocedureを返す
         # JSRuntimeHandleのfinalizerとして使う
         # @param [Integer] pid
         def self.finalizer(pid)
           proc do
-            Process.kill(:KILL, pid)
-          rescue StandardError => e
-            warn e
+            err = kill_process(pid)
+            warn err unless err.nil?
           end
         end
 
+        private
+
         # プロセスに繋がったsocketを作って返す
         # @return [Net::BufferedIO]
-        def get_socket
-          Net::BufferedIO.new(UNIXSocket.new(@socket_path))
+        def create_socket(socket_path)
+          Net::BufferedIO.new(UNIXSocket.new(socket_path))
         end
 
         # JavaScriptランタイムにリクエストを送る
+        # @param [String] socket_path TODO
         # @param [String] path HTTPリクエスト時のPath("/eval"など)
         # @param [String?] content_type bodyのContent-type
         # @param [String] body HTTPリクエストのbody
         # @return [object?]
-        def post_request(path, content_type = nil, body = nil)
-          socket = get_socket
+        # これ以上分割する意味が特になさそうかつ単純な順次処理なのでlintエラー抑制で対処
+        # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
+        def post_request(socket_path, path, content_type = nil, body = nil)
+          socket = create_socket socket_path
 
           # IOでタイムアウトが発生したのでとりあえず伸ばして対処
           socket.read_timeout *= 100
@@ -137,24 +147,26 @@ module ExecJS
           # Net::HTTPGenericRequest#exec internal use onlyとマークされているので使いたくない 代替案はNet::HTTP#requestのoverride(めんどいので保留)
           request.exec(socket, '1.1', path)
 
+          # rubocopの提案を採用すると動作が変わって無限ループになるので抑制
+          # rubocop:disable Lint/Loop
           begin
             response = Net::HTTPResponse.read_new(socket)
           end while response.is_a?(Net::HTTPContinue)
+          # rubocop:enable Lint/Loop
           response.reading_body(socket, request.response_body_permitted?) {}
 
           if response.code == '200'
             result = response.body
-            if /\S/ =~ result
-              ::JSON.parse(response.body, create_additions: false)
-            end
+            ::JSON.parse(response.body, create_additions: false) if /\S/.match?(result)
           else
             message, stack = response.body.split "\0"
-            error_class = message =~ /SyntaxError:/ ? RuntimeError : ProgramError
+            error_class = /SyntaxError:/.match?(message) ? RuntimeError : ProgramError
             error = error_class.new(message)
             error.set_backtrace(stack)
             raise error
           end
         end
+        # rubocop:enable Metrics/MethodLength,Metrics/AbcSize
       end
 
       attr_reader :name
@@ -162,7 +174,7 @@ module ExecJS
       # @param [String] name ランタイムの名称
       # @param [Array<String>] command JavaScriptランタイムのコマンド候補 ["deno run", "node"] など
       # @param [String] runner_path JavaScriptランタイムで実行するjsファイルのパス
-      def initialize(name, command, runner_path = File.expand_path('runner.js', __dir__), deprecated = false)
+      def initialize(name, command, runner_path = File.expand_path('runner.js', __dir__), deprecated: false)
         super()
         @name = name
         @command = command
@@ -210,7 +222,7 @@ module ExecJS
           command, *args = command_item
           commands = search_set.filter_map do |setting|
             base_path, extension = setting
-            executable_path = base_path != '' ? File.join(base_path, command + extension) : command + extension
+            executable_path = base_path == '' ? command + extension : File.join(base_path, command + extension)
             File.executable?(executable_path) && File.exist?(executable_path) ? executable_path : nil
           end
           command = commands.first

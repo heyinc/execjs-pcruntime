@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Copied from https://github.com/rails/execjs/blob/v2.8.1/test/bench_execjs.rb
 # Released under MIT License
 #
