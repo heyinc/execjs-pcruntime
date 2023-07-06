@@ -12,8 +12,8 @@ module ExecJS
     class ContextProcessRuntime < Runtime
       # override ExecJS::Runtime::Context
       class Context < Runtime::Context
-        # @param [String] runtime ContextProcessRuntimeのインスタンスを期待
-        # @param [String] source 起動時に読み込むJavaScriptソース
+        # @param [String] runtime Instance of ContextProcessRuntime
+        # @param [String] source JavaScript source code that Runtime load at startup
         # @param [any] options
         def initialize(runtime, source = '', options = {})
           super(runtime, source, options)
@@ -21,13 +21,13 @@ module ExecJS
           # @type [JSRuntimeHandle]
           @runtime = runtime.create_runtime_handle
 
-          # Contextに初期ソースを入れ込む
+          # load initial source to Context
           @runtime.evaluate(source.encode('UTF-8'))
         end
 
         # override ExecJS::Runtime::Context#eval
         # @param [String] source
-        # @param [any] options
+        # @param [any] _options
         def eval(source, _options = {})
           return unless /\S/.match?(source)
 
@@ -36,7 +36,7 @@ module ExecJS
 
         # override ExecJS::Runtime::Context#exec
         # @param [String] source
-        # @param [any] options
+        # @param [any] _options
         def exec(source, _options = {})
           @runtime.evaluate("(()=>{#{source.encode('UTF-8')}})()")
         end
@@ -49,31 +49,31 @@ module ExecJS
         end
       end
 
-      # JavaScriptランタイムのハンドル
-      # コンストラクタで起動して、finalizerで終了処理をする
+      # Handle of JavaScript Runtime
+      # launch Runtime by .new and finished on finalizer
       class JSRuntimeHandle
-        # @param [Array<String>] binary node(またはそれに準ずるJavaScriptランタイム)バイナリの起動コマンド ["node"] ["deno", "run"]など
-        # @param [String] initial_source 初期状態で読み込ませるJavaScriptソースコードのパス
+        # @param [Array<String>] binary Launch command for the node(or similar JavaScript Runtime) binary,
+        #     such as ['node'], ['deno', 'run'].
+        # @param [String] initial_source Path of .js Runtime loads at startup.
         def initialize(binary, initial_source)
           Dir::Tmpname.create 'execjs_pcruntime' do |path|
-            # Dir::Tmpname.createはErrno::EEXISTをrescueしてtmpnameの作成を再施行するので
-            # 失敗した場合(create_processからnilが返ってきた場合)にこれをraiseする
+            # Dir::Tmpname.create rescues Errno::EEXIST and retry block
+            # So, raise it if failed to create Process.
             @runtime_pid = create_process(path, *binary, initial_source) || raise(Errno::EEXIST)
             @socket_path = path
           end
           ObjectSpace.define_finalizer(self, self.class.finalizer(@runtime_pid))
         end
 
-        # JavaScriptコードを評価してその結果を返す
-        # JavaScript側のエラーはRuby側に透過する
-        # @param [String] source JavaScriptソース
+        # Evaluate JavaScript source code and return the result.
+        # @param [String] source JavaScript source code
         # @return [object]
         def evaluate(source)
           post_request(@socket_path, '/eval', 'text/javascript', source)
         end
 
-        # 指定IDのプロセスをkillするprocedureを返す
-        # JSRuntimeHandleのfinalizerとして使う
+        # Create a procedure to kill the Process that has specified pid.
+        # It used as the finalizer of JSRuntimeHandle.
         # @param [Integer] pid
         def self.finalizer(pid)
           proc do
@@ -82,10 +82,10 @@ module ExecJS
           end
         end
 
-        # 指定pidのプロセスをkillする
-        # エラーがso送出された場合はそれを返す
+        # Kill the Process that has specified pid.
+        # If raised error then return it.
         # @param [Integer] pid
-        # @return [StandardError, nil] エラーが発生した場合はそのエラーを返す
+        # @return [StandardError, nil] return error iff an error is raised
         def self.kill_process(pid)
           Process.kill(:KILL, pid)
           nil
@@ -95,10 +95,10 @@ module ExecJS
 
         private
 
-        # blockの実行を適当に時間を開けて何度か試行する
-        # @param [Integer] times 最大試行回数
-        # @yieldreturn [Boolean] blockの試行が成功したらtrue
-        # @return [Boolean] blockの試行が成功したらtrue 最大試行回数に達したらfalse
+        # Attempt to execute the block several times, spacing out the attempts over a certain period.
+        # @param [Integer] times maximum number of attempts
+        # @yieldreturn [Boolean] true iff succeed execute
+        # @return [Boolean] true if the block attempt is successful, false if the maximum number of attempts is reached
         def delayed_retries(times)
           while times.positive?
             return true if yield
@@ -109,10 +109,11 @@ module ExecJS
           false
         end
 
-        # JavaScriptランタイムのプロセスを起動する
-        # @param [String] socket_path UNIXドメインソケットに使うパス PORT環境変数を通じてランタイムに渡される
-        # @param [Array<String>] command ランタイムの起動コマンド ["node", "runner.js"] など
-        # @return [Integer, nil] プロセスの起動に成功した場合はpid 失敗したらnil
+        # Launch JavaScript Runtime Process.
+        # @param [String] socket_path path used for the UNIX domain socket
+        #     it is passed at Runtime through the PORT environment variable
+        # @param [Array<String>] command command to start the Runtime such as ['node', 'runner.js']
+        # @return [Integer, nil] if the Process successfully launches, return its pid. if it fails return nil
         def create_process(socket_path, *command)
           pid = Process.spawn({ 'PORT' => socket_path }, *command)
 
@@ -130,24 +131,25 @@ module ExecJS
           pid
         end
 
-        # プロセスに繋がったsocketを作って返す
+        # Create a socket connected to the Process.
         # @return [Net::BufferedIO]
         def create_socket(socket_path)
           Net::BufferedIO.new(UNIXSocket.new(socket_path))
         end
 
-        # JavaScriptランタイムにリクエストを送る
-        # @param [String] socket_path UNIXドメインソケットのパス
-        # @param [String] path HTTPリクエスト時のPath("/eval"など)
-        # @param [String?] content_type bodyのContent-type
-        # @param [String] body HTTPリクエストのbody
+        # Send request to JavaScript Runtime.
+        # @param [String] socket_path path of the UNIX domain socket
+        # @param [String] path Path on HTTP request such as '/eval'
+        # @param [String, nil] content_type Content-type of body
+        # @param [String, nil] body body of HTTP request
         # @return [object?]
-        # これ以上分割する意味が特になさそうかつ単純な順次処理なのでlintエラー抑制で対処
+        # There seems to be no particular meaning in dividing it any further and it's a simple sequential process
+        # so suppressing lint errors.
         # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
         def post_request(socket_path, path, content_type = nil, body = nil)
           socket = create_socket socket_path
 
-          # IOでタイムアウトが発生したのでとりあえず伸ばして対処
+          # timeout occurred during the test
           socket.read_timeout *= 100
           socket.write_timeout *= 100
 
@@ -158,10 +160,11 @@ module ExecJS
             request.body = body
           end
 
-          # Net::HTTPGenericRequest#exec internal use onlyとマークされているので使いたくない 代替案はNet::HTTP#requestのoverride(めんどいので保留)
+          # Net::HTTPGenericRequest#exec
+          # I'd rather not use it as it's marked for 'internal use only', but I can't find a good alternative.
           request.exec(socket, '1.1', path)
 
-          # rubocopの提案を採用すると動作が変わって無限ループになるので抑制
+          # Adopting RuboCop's proposal changes the operation and causes an infinite loop
           # rubocop:disable Lint/Loop
           begin
             response = Net::HTTPResponse.read_new(socket)
@@ -185,9 +188,9 @@ module ExecJS
 
       attr_reader :name
 
-      # @param [String] name ランタイムの名称
-      # @param [Array<String>] command JavaScriptランタイムのコマンド候補 ["deno run", "node"] など
-      # @param [String] runner_path JavaScriptランタイムで実行するjsファイルのパス
+      # @param [String] name name of Runtime
+      # @param [Array<String>] command candidates for JavaScript Runtime commands such as ['deno run', 'node']
+      # @param [String] runner_path path of the .js file to run in the Runtime
       def initialize(name, command, runner_path = File.expand_path('runner.js', __dir__), deprecated: false)
         super()
         @name = name
@@ -208,7 +211,7 @@ module ExecJS
         @deprecated
       end
 
-      # JavaScriptランタイムを起動してそのハンドルを返す
+      # Launch JavaScript Runtime and return its handle.
       # @return [JSRuntimeHandle]
       def create_runtime_handle
         JSRuntimeHandle.new(binary, @runner_path)
@@ -216,15 +219,16 @@ module ExecJS
 
       private
 
-      # JavaScriptランタイムの起動コマンドを返す
-      # コンストラクタで渡されたコマンドを遅延評価かつキャッシュ
+      # Return the launch command for the JavaScript Runtime.
       # @return [Array<String>]
       def binary
         @binary ||= which(@command)
       end
 
-      # @param [Array<String>] commands コマンドの候補 ["deno run", "node"] など
-      # @return [Array<String>] コマンドの絶対パスとコマンドライン引数 ["deno", "run"] など
+      # Locate a executable file in the path.
+      # @param [Array<String>] commands candidates for commands such as ['deno run', 'node']
+      # @return [Array<String>] the absolute path of the command and command-line arguments
+      #     e.g. ["/the/absolute/path/to/deno", "run"]
       def which(commands)
         commands.each do |command|
           command, *args = split_command_string command
@@ -233,10 +237,10 @@ module ExecJS
         end
       end
 
-      # コマンドから絶対パスを検索する
-      # @param [String] command コマンド名
-      # @return [String, nil] コマンドの絶対パス 見つからなかった場合はnil
-      # これ以上メソッド分割すると却って読みにくくなりそうなので抑制
+      # Search for absolute path of the executable file from the command.
+      # @param [String] command
+      # @return [String, nil] the absolute path of the command, or nil if not found
+      # It seems that further method splitting might actually make it harder to read, so suppressing
       # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
       def search_executable_path(command)
         @extensions ||= ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [''] : ['']
@@ -251,10 +255,10 @@ module ExecJS
       end
       # rubocop:enable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
 
-      # コマンド文字列を分割する
+      # Split command string
       #   split_command_string "deno run" # ["deno", "run"]
-      # @param [String] command コマンド文字列
-      # @return [Array<String>] 分割された配列
+      # @param [String] command command string
+      # @return [Array<String>] array split from the command string
       def split_command_string(command)
         regex = /([^\s"']+)|"([^"]+)"|'([^']+)'(?:\s+|\s*\Z)/
         command.scan(regex).flatten.compact
