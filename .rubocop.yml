@@ -1,0 +1,10 @@
+AllCops:
+  NewCops: disable
+
+Metrics/MethodLength:
+  Max: 16
+
+require:
+  - rubocop-performance
+  - rubocop-minitest
+  - rubocop-rake

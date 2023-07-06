@@ -3,6 +3,7 @@
 !/lib
 !/test
 !/.gitignore
+!/.rubocop.yml
 !/CODE_OF_CONDUCT.md
 !/execjs-pcruntime.gemspec
 !/Gemfile

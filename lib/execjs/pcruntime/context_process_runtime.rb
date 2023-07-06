@@ -74,6 +74,7 @@ module ExecJS
 
         def self.kill_process(pid)
           Process.kill(:KILL, pid)
+          nil
         rescue StandardError => e
           e
         end
@@ -110,7 +111,7 @@ module ExecJS
         def self.finalizer(pid)
           proc do
             err = kill_process(pid)
-            warn err unless err.nil?
+            warn err.full_message unless err.nil?
           end
         end
 
@@ -212,22 +213,38 @@ module ExecJS
       # @param [Array<String>] commands コマンドの候補 ["deno run", "node"] など
       # @return [Array<String>] コマンドの絶対パスとコマンドライン引数 ["deno", "run"] など
       def which(commands)
-        extensions = ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [''] : ['']
-        search_set = (ENV['PATH'].split(File::PATH_SEPARATOR) + [''])
-                     .flat_map { |base_path| extensions.map { |ext| [base_path, ext] } }
-        regex = /([^\s"']+)|"([^"]+)"|'([^']+)'(?:\s+|\s*\Z)/
         commands.each do |command|
-          command_item = []
-          command.scan(regex) { |match| command_item << Array(match).flatten.find { |c| c } }
-          command, *args = command_item
-          commands = search_set.filter_map do |setting|
-            base_path, extension = setting
-            executable_path = base_path == '' ? command + extension : File.join(base_path, command + extension)
-            File.executable?(executable_path) && File.exist?(executable_path) ? executable_path : nil
-          end
-          command = commands.first
+          command, *args = split_command_string command
+          command = search_executable_path command
           return [command] + args unless command.nil?
         end
+      end
+
+      # コマンドから絶対パスを検索する
+      # @param [String] command コマンド名
+      # @return [String, nil] コマンドの絶対パス 見つからなかった場合はnil
+      # これ以上メソッド分割すると却って読みにくくなりそうなので抑制
+      # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+      def search_executable_path(command)
+        @extensions ||= ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [''] : ['']
+        @path ||= ENV['PATH'].split(File::PATH_SEPARATOR) + ['']
+        @path.each do |base_path|
+          @extensions.each do |extension|
+            executable_path = base_path == '' ? command + extension : File.join(base_path, command + extension)
+            return executable_path if File.executable?(executable_path) && File.exist?(executable_path)
+          end
+        end
+        nil
+      end
+      # rubocop:enable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+
+      # コマンド文字列を分割する
+      #   split_command_string "deno run" # ["deno", "run"]
+      # @param [String] command コマンド文字列
+      # @return [Array<String>] 分割された配列
+      def split_command_string(command)
+        regex = /([^\s"']+)|"([^"]+)"|'([^']+)'(?:\s+|\s*\Z)/
+        command.scan(regex).flatten.compact
       end
     end
   end
