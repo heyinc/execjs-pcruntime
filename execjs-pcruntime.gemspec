@@ -8,22 +8,16 @@ Gem::Specification.new do |spec|
   spec.name          = 'execjs-pcruntime'
   spec.version       = Execjs::PCRuntime::VERSION
   spec.authors       = ['White-Green']
-  spec.email         = ['shintaro.otsuka@st.inc']
   spec.required_ruby_version = '>3.0.0'
-
-  spec.summary       = 'TO_DO: Write a short summary, because RubyGems requires one.'
-  spec.description   = 'TO_DO: Write a longer description or delete this line.'
-  # spec.homepage      = "TODO: Put your gem's website or public repo URL here."
+  spec.summary       = 'Fast ExecJS Runtime using Process as a Context.'
   spec.license       = 'MIT'
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
   # to allow pushing to a single host or delete this section to allow pushing to any host.
   if spec.respond_to?(:metadata)
     spec.metadata['allowed_push_host'] = "TODO: Set to 'http://mygemserver.com'"
-
-    # spec.metadata["homepage_uri"] = spec.homepage
-    # spec.metadata["source_code_uri"] = "TODO: Put your gem's public repo URL here."
-    # spec.metadata["changelog_uri"] = "TODO: Put your gem's CHANGELOG.md URL here."
+    spec.metadata['source_code_uri'] = 'https://github.com/heyinc/execjs-pcruntime'
+    spec.metadata['rubygems_mfa_required'] = 'true'
   else
     raise 'RubyGems 2.0 or newer is required to protect against ' \
           'public gem pushes.'
@@ -34,9 +28,5 @@ Gem::Specification.new do |spec|
   spec.files = Dir.chdir(File.expand_path(__dir__)) do
     `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features)/}) }
   end
-  spec.bindir        = 'exe'
-  spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ['lib']
-
-  spec.metadata['rubygems_mfa_required'] = 'true'
 end
