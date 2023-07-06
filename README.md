@@ -1,25 +1,26 @@
-# Execjs::PCRuntime
+# ExecJS::PCRuntime
 
-実行毎ではなくContext毎にNode.jsプロセスを起動することで高速化したExecJSランタイム
+Accelerated ExecJS Runtime by launching Node.js Processes per Context, not per execution.
 
 inspired by [execjs-fastnode](https://github.com/jhawthorn/execjs-fastnode)
 
 ## Installation
 
-Gemfileに以下の記述を追加
+Add this line to your application's Gemfile:
 
 ```ruby
-gem 'execjs-pcruntime', :git => 'https://github.com/heyinc/execjs-pcruntime'
+gem 'execjs-pcruntime'
 ```
-その後、bundleコマンドを実行してインストールします
+
+And then execute:
 ```
 $ bundle
 ```
 
 ## Usage
 
-インストールのみしておけば自動でランタイムが差し変わります
-強制的に設定する場合は環境変数を利用できます`EXECJS_RUNTIME=PCRuntime`
+Once installed, the Runtime will automatically be replaced.
+If you want to set it, you can use environment variable `EXECJS_RUNTIME=PCRuntime`.
 
 ## Development
 
