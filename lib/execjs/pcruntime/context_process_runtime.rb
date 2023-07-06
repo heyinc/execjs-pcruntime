@@ -56,45 +56,12 @@ module ExecJS
         # @param [String] initial_source 初期状態で読み込ませるJavaScriptソースコードのパス
         def initialize(binary, initial_source)
           Dir::Tmpname.create 'execjs_pcruntime' do |path|
-            @runtime_pid = create_process(path, *binary, initial_source)
+            # Dir::Tmpname.createはErrno::EEXISTをrescueしてtmpnameの作成を再施行するので
+            # 失敗した場合(create_processからnilが返ってきた場合)にこれをraiseする
+            @runtime_pid = create_process(path, *binary, initial_source) || raise(Errno::EEXIST)
             @socket_path = path
           end
           ObjectSpace.define_finalizer(self, self.class.finalizer(@runtime_pid))
-        end
-
-        def delayed_retries(times)
-          while times.positive?
-            return true if yield
-
-            sleep 0.05
-            times -= 1
-          end
-          false
-        end
-
-        def self.kill_process(pid)
-          Process.kill(:KILL, pid)
-          nil
-        rescue StandardError => e
-          e
-        end
-
-        def create_process(socket_path, *command)
-          pid = Process.spawn({ 'PORT' => socket_path }, *command)
-
-          unless delayed_retries(20) { File.exist?(socket_path) }
-            kill_process(pid)
-            raise Errno::EEXIST
-          end
-
-          begin
-            # nodejsの起動に失敗しているとここでエラーが出るため、Dir::Tmpname.createに渡したブロック全体が再実行される
-            post_request(socket_path, '/')
-          rescue StandardError
-            kill_process(pid)
-            raise Errno::EEXIST
-          end
-          pid
         end
 
         # JavaScriptコードを評価してその結果を返す
@@ -115,7 +82,53 @@ module ExecJS
           end
         end
 
+        # 指定pidのプロセスをkillする
+        # エラーがso送出された場合はそれを返す
+        # @param [Integer] pid
+        # @return [StandardError, nil] エラーが発生した場合はそのエラーを返す
+        def self.kill_process(pid)
+          Process.kill(:KILL, pid)
+          nil
+        rescue StandardError => e
+          e
+        end
+
         private
+
+        # blockの実行を適当に時間を開けて何度か試行する
+        # @param [Integer] times 最大試行回数
+        # @yieldreturn [Boolean] blockの試行が成功したらtrue
+        # @return [Boolean] blockの試行が成功したらtrue 最大試行回数に達したらfalse
+        def delayed_retries(times)
+          while times.positive?
+            return true if yield
+
+            sleep 0.05
+            times -= 1
+          end
+          false
+        end
+
+        # JavaScriptランタイムのプロセスを起動する
+        # @param [String] socket_path UNIXドメインソケットに使うパス PORT環境変数を通じてランタイムに渡される
+        # @param [Array<String>] command ランタイムの起動コマンド ["node", "runner.js"] など
+        # @return [Integer, nil] プロセスの起動に成功した場合はpid 失敗したらnil
+        def create_process(socket_path, *command)
+          pid = Process.spawn({ 'PORT' => socket_path }, *command)
+
+          unless delayed_retries(20) { File.exist?(socket_path) }
+            self.class.kill_process(pid)
+            return nil
+          end
+
+          begin
+            post_request(socket_path, '/')
+          rescue StandardError
+            self.class.kill_process(pid)
+            return nil
+          end
+          pid
+        end
 
         # プロセスに繋がったsocketを作って返す
         # @return [Net::BufferedIO]
