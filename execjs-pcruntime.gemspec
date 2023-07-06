@@ -10,6 +10,7 @@ Gem::Specification.new do |spec|
   spec.authors       = ['White-Green']
   spec.required_ruby_version = '>3.0.0'
   spec.summary       = 'Fast ExecJS Runtime using Process as a Context.'
+  spec.homepage      = 'https://rubygems.org/gems/execjs-pcruntime'
   spec.license       = 'MIT'
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
