@@ -1,28 +1,25 @@
-# Execjs::Pcruntime
+# Execjs::PCRuntime
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/execjs/pcruntime`. To experiment with that code, run `bin/console` for an interactive prompt.
+実行毎ではなくContext毎にNode.jsプロセスを起動することで高速化したExecJSランタイム
 
-TODO: Delete this and the text above, and describe your gem
+inspired by [execjs-fastnode](https://github.com/jhawthorn/execjs-fastnode)
 
 ## Installation
 
-Add this line to your application's Gemfile:
+Gemfileに以下の記述を追加
 
 ```ruby
-gem 'execjs-pcruntime'
+gem 'execjs-pcruntime', :git => 'https://github.com/heyinc/execjs-pcruntime'
 ```
-
-And then execute:
-
-    $ bundle
-
-Or install it yourself as:
-
-    $ gem install execjs-pcruntime
+その後、bundleコマンドを実行してインストールします
+```
+$ bundle
+```
 
 ## Usage
 
-TODO: Write usage instructions here
+インストールのみしておけば自動でランタイムが差し変わります
+強制的に設定する場合は環境変数を利用できます`EXECJS_RUNTIME=PCRuntime`
 
 ## Development
 
