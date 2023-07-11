@@ -239,20 +239,17 @@ module ExecJS
       # Search for absolute path of the executable file from the command.
       # @param [String] command
       # @return [String, nil] the absolute path of the command, or nil if not found
-      # It seems that further method splitting might actually make it harder to read, so suppressing
-      # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
       def search_executable_path(command)
-        @extensions ||= ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [''] : ['']
-        @path ||= ENV['PATH'].split(File::PATH_SEPARATOR) + ['']
-        @path.each do |base_path|
-          @extensions.each do |extension|
+        extensions = ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [''] : ['']
+        path = ENV['PATH'].split(File::PATH_SEPARATOR) + ['']
+        path.each do |base_path|
+          extensions.each do |extension|
             executable_path = base_path == '' ? command + extension : File.join(base_path, command + extension)
             return executable_path if File.executable?(executable_path) && File.exist?(executable_path)
           end
         end
         nil
       end
-      # rubocop:enable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
 
       # Split command string
       #   split_command_string "deno run" # ["deno", "run"]
