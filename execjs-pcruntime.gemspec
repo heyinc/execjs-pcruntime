@@ -13,6 +13,8 @@ Gem::Specification.new do |spec|
   spec.homepage      = 'https://rubygems.org/gems/execjs-pcruntime'
   spec.license       = 'MIT'
 
+  spec.add_dependency 'execjs', '~> 2.0'
+
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
   # to allow pushing to a single host or delete this section to allow pushing to any host.
   if spec.respond_to?(:metadata)

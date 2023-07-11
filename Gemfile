@@ -7,8 +7,6 @@ git_source(:github) { |repo_name| "https://github.com/#{repo_name}" }
 # Specify your gem's dependencies in execjs-pcruntime.gemspec
 gemspec
 
-gem 'execjs', '~> 2.0'
-
 group :development do
   gem 'rubocop', require: false
   gem 'rubocop-minitest', require: false
