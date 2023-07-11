@@ -245,7 +245,7 @@ module ExecJS
         path.each do |base_path|
           extensions.each do |extension|
             executable_path = base_path == '' ? command + extension : File.join(base_path, command + extension)
-            return executable_path if File.executable?(executable_path) && File.exist?(executable_path)
+            return executable_path if File.executable?(executable_path)
           end
         end
         nil
