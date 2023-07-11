@@ -54,12 +54,12 @@ module ExecJS
       class JSRuntimeHandle
         # @param [Array<String>] binary Launch command for the node(or similar JavaScript Runtime) binary,
         #     such as ['node'], ['deno', 'run'].
-        # @param [String] initial_source Path of .js Runtime loads at startup.
-        def initialize(binary, initial_source)
+        # @param [String] initial_source_path Path of .js Runtime loads at startup.
+        def initialize(binary, initial_source_path)
           Dir::Tmpname.create 'execjs_pcruntime' do |path|
             # Dir::Tmpname.create rescues Errno::EEXIST and retry block
             # So, raise it if failed to create Process.
-            @runtime_pid = create_process(path, *binary, initial_source) || raise(Errno::EEXIST)
+            @runtime_pid = create_process(path, *binary, initial_source_path) || raise(Errno::EEXIST)
             @socket_path = path
           end
           ObjectSpace.define_finalizer(self, self.class.finalizer(@runtime_pid))
