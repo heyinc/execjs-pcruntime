@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
-require 'execjs/pcruntime/version'
-require 'execjs/pcruntime/context_process_runtime'
 require 'execjs/runtimes'
+require 'execjs/pcruntime/context_process_runtime'
 
 module ExecJS
   # extends ExecJS::Runtimes

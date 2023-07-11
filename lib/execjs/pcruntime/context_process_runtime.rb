@@ -202,7 +202,6 @@ module ExecJS
 
       # override ExecJS::Runtime#available?
       def available?
-        require 'json'
         binary ? true : false
       end
 
