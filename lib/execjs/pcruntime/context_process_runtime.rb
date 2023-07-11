@@ -8,9 +8,9 @@ require 'net/http'
 
 module ExecJS
   module PCRuntime
-    # override ExecJS::Runtime
+    # implementation of ExecJS::Runtime
     class ContextProcessRuntime < Runtime
-      # override ExecJS::Runtime::Context
+      # implementation of ExecJS::Runtime::Context
       class Context < Runtime::Context
         # @param [String] runtime Instance of ContextProcessRuntime
         # @param [String] source JavaScript source code that Runtime load at startup
@@ -25,7 +25,7 @@ module ExecJS
           @runtime.evaluate(source.encode('UTF-8'))
         end
 
-        # override ExecJS::Runtime::Context#eval
+        # implementation of ExecJS::Runtime::Context#eval
         # @param [String] source
         # @param [any] _options
         def eval(source, _options = {})
@@ -34,14 +34,14 @@ module ExecJS
           @runtime.evaluate("(#{source.encode('UTF-8')})")
         end
 
-        # override ExecJS::Runtime::Context#exec
+        # implementation of ExecJS::Runtime::Context#exec
         # @param [String] source
         # @param [any] _options
         def exec(source, _options = {})
           @runtime.evaluate("(()=>{#{source.encode('UTF-8')}})()")
         end
 
-        # override ExecJS::Runtime:Context#call
+        # implementation of ExecJS::Runtime:Context#call
         # @param [String] identifier
         # @param [Array<_ToJson>] args
         def call(identifier, *args)
@@ -200,7 +200,7 @@ module ExecJS
         @deprecated = deprecated
       end
 
-      # override ExecJS::Runtime#available?
+      # implementation of ExecJS::Runtime#available?
       def available?
         binary ? true : false
       end
@@ -252,7 +252,7 @@ module ExecJS
       end
 
       # Split command string
-      #   split_command_string "deno run" # ["deno", "run"]
+      #   split_command_string "deno run" => ["deno", "run"]
       # @param [String] command command string
       # @return [Array<String>] array split from the command string
       def split_command_string(command)
