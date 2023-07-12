@@ -8,10 +8,12 @@ Gem::Specification.new do |spec|
   spec.name          = 'execjs-pcruntime'
   spec.version       = Execjs::PCRuntime::VERSION
   spec.authors       = ['White-Green']
-  spec.required_ruby_version = '>3.0.0'
+  spec.required_ruby_version = '>=3.0.0'
   spec.summary       = 'Fast ExecJS Runtime using Process as a Context.'
   spec.homepage      = 'https://rubygems.org/gems/execjs-pcruntime'
   spec.license       = 'MIT'
+
+  spec.add_dependency 'execjs', '~> 2.0'
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
   # to allow pushing to a single host or delete this section to allow pushing to any host.

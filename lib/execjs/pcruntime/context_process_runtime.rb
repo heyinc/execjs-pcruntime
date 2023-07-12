@@ -8,15 +8,15 @@ require 'net/http'
 
 module ExecJS
   module PCRuntime
-    # override ExecJS::Runtime
+    # implementation of ExecJS::Runtime
     class ContextProcessRuntime < Runtime
-      # override ExecJS::Runtime::Context
+      # implementation of ExecJS::Runtime::Context
       class Context < Runtime::Context
         # @param [String] runtime Instance of ContextProcessRuntime
         # @param [String] source JavaScript source code that Runtime load at startup
         # @param [any] options
         def initialize(runtime, source = '', options = {})
-          super(runtime, source, options)
+          super
 
           # @type [JSRuntimeHandle]
           @runtime = runtime.create_runtime_handle
@@ -25,7 +25,7 @@ module ExecJS
           @runtime.evaluate(source.encode('UTF-8'))
         end
 
-        # override ExecJS::Runtime::Context#eval
+        # implementation of ExecJS::Runtime::Context#eval
         # @param [String] source
         # @param [any] _options
         def eval(source, _options = {})
@@ -34,14 +34,14 @@ module ExecJS
           @runtime.evaluate("(#{source.encode('UTF-8')})")
         end
 
-        # override ExecJS::Runtime::Context#exec
+        # implementation of ExecJS::Runtime::Context#exec
         # @param [String] source
         # @param [any] _options
         def exec(source, _options = {})
           @runtime.evaluate("(()=>{#{source.encode('UTF-8')}})()")
         end
 
-        # override ExecJS::Runtime:Context#call
+        # implementation of ExecJS::Runtime:Context#call
         # @param [String] identifier
         # @param [Array<_ToJson>] args
         def call(identifier, *args)
@@ -54,12 +54,12 @@ module ExecJS
       class JSRuntimeHandle
         # @param [Array<String>] binary Launch command for the node(or similar JavaScript Runtime) binary,
         #     such as ['node'], ['deno', 'run'].
-        # @param [String] initial_source Path of .js Runtime loads at startup.
-        def initialize(binary, initial_source)
+        # @param [String] initial_source_path Path of .js Runtime loads at startup.
+        def initialize(binary, initial_source_path)
           Dir::Tmpname.create 'execjs_pcruntime' do |path|
             # Dir::Tmpname.create rescues Errno::EEXIST and retry block
             # So, raise it if failed to create Process.
-            @runtime_pid = create_process(path, *binary, initial_source) || raise(Errno::EEXIST)
+            @runtime_pid = create_process(path, *binary, initial_source_path) || raise(Errno::EEXIST)
             @socket_path = path
           end
           ObjectSpace.define_finalizer(self, self.class.finalizer(@runtime_pid))
@@ -176,6 +176,7 @@ module ExecJS
             result = response.body
             ::JSON.parse(response.body, create_additions: false) if /\S/.match?(result)
           else
+            # expects ErrorMessage\0StackTrace =~ response.body
             message, stack = response.body.split "\0"
             error_class = /SyntaxError:/.match?(message) ? RuntimeError : ProgramError
             error = error_class.new(message)
@@ -200,9 +201,8 @@ module ExecJS
         @deprecated = deprecated
       end
 
-      # override ExecJS::Runtime#available?
+      # implementation of ExecJS::Runtime#available?
       def available?
-        require 'json'
         binary ? true : false
       end
 
@@ -231,7 +231,7 @@ module ExecJS
       #     e.g. ["/the/absolute/path/to/deno", "run"]
       def which(commands)
         commands.each do |command|
-          command, *args = split_command_string command
+          command, *args = Shellwords.split command
           command = search_executable_path command
           return [command] + args unless command.nil?
         end
@@ -240,28 +240,16 @@ module ExecJS
       # Search for absolute path of the executable file from the command.
       # @param [String] command
       # @return [String, nil] the absolute path of the command, or nil if not found
-      # It seems that further method splitting might actually make it harder to read, so suppressing
-      # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
       def search_executable_path(command)
-        @extensions ||= ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [''] : ['']
-        @path ||= ENV['PATH'].split(File::PATH_SEPARATOR) + ['']
-        @path.each do |base_path|
-          @extensions.each do |extension|
+        extensions = ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [''] : ['']
+        path = ENV['PATH'].split(File::PATH_SEPARATOR) + ['']
+        path.each do |base_path|
+          extensions.each do |extension|
             executable_path = base_path == '' ? command + extension : File.join(base_path, command + extension)
-            return executable_path if File.executable?(executable_path) && File.exist?(executable_path)
+            return executable_path if File.executable?(executable_path)
           end
         end
         nil
-      end
-      # rubocop:enable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
-
-      # Split command string
-      #   split_command_string "deno run" # ["deno", "run"]
-      # @param [String] command command string
-      # @return [Array<String>] array split from the command string
-      def split_command_string(command)
-        regex = /([^\s"']+)|"([^"]+)"|'([^']+)'(?:\s+|\s*\Z)/
-        command.scan(regex).flatten.compact
       end
     end
   end
