@@ -231,7 +231,7 @@ module ExecJS
       #     e.g. ["/the/absolute/path/to/deno", "run"]
       def which(commands)
         commands.each do |command|
-          command, *args = split_command_string command
+          command, *args = Shellwords.split command
           command = search_executable_path command
           return [command] + args unless command.nil?
         end
@@ -250,15 +250,6 @@ module ExecJS
           end
         end
         nil
-      end
-
-      # Split command string
-      #   split_command_string "deno run" => ["deno", "run"]
-      # @param [String] command command string
-      # @return [Array<String>] array split from the command string
-      def split_command_string(command)
-        regex = /([^\s"']+)|"([^"]+)"|'([^']+)'(?:\s+|\s*\Z)/
-        command.scan(regex).flatten.compact
       end
     end
   end
