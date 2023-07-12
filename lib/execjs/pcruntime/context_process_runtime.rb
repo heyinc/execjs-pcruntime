@@ -16,7 +16,7 @@ module ExecJS
         # @param [String] source JavaScript source code that Runtime load at startup
         # @param [any] options
         def initialize(runtime, source = '', options = {})
-          super(runtime, source, options)
+          super
 
           # @type [JSRuntimeHandle]
           @runtime = runtime.create_runtime_handle
