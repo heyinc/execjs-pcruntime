@@ -176,6 +176,7 @@ module ExecJS
             result = response.body
             ::JSON.parse(response.body, create_additions: false) if /\S/.match?(result)
           else
+            # expects ErrorMessage\0StackTrace =~ response.body
             message, stack = response.body.split "\0"
             error_class = /SyntaxError:/.match?(message) ? RuntimeError : ProgramError
             error = error_class.new(message)
