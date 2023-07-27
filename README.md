@@ -4,6 +4,23 @@ Accelerated ExecJS Runtime by launching Node.js Processes per Context, not per e
 
 inspired by [execjs-fastnode](https://github.com/jhawthorn/execjs-fastnode)
 
+## How PCRuntime fast?
+
+The existing Node.js runtime spawns a Node.js process for each eval, regardless of whether it compiles or not.
+To reduce this overhead, execjs-fastnode is designed to launch a single Node.js process and manage the Context in JavaScript.
+
+|                                           Node.js                                           |                                          execjs-fastnode                                           |
+|:-------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------:|
+| ![Sequence Diagram of Node.js Runtime](./doc_resources/out/sequence_nodejs/sequence_nodejs.svg) | ![Sequence Diagram of FastNode Runtime](./doc_resources/out/sequence_fastnode1/sequence_fastnode1.svg) |
+
+execjs-fastnode is designed to limit the number of threads that can access a Node.js process to 1 to avoid the race condition when multiple Contexts are used.
+execjs-pcruntime works lock-free by creating a Node.js process for each Context.
+This improves performance when used with multi-threading.
+
+|                                             execjs-fastnode(multi-threading)                                              |                                        execjs-pcruntime                                         |
+|:-------------------------------------------------------------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------:|
+| ![Sequence Diagram of FastNode Runtime in multi-threading](./doc_resources/out/sequence_fastnode2/sequence_fastnode2.svg) | ![Sequence Diagram of PCRuntime](./doc_resources/out/sequence_pcruntime/sequence_pcruntime.svg) |
+
 ## Requirements
 
 - Ruby >= 3.0.0

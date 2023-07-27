@@ -1,0 +1,25 @@
+@startuml
+
+!pragma teoz true
+
+participant "User program" as ruby
+participant "execjs Context" as context
+participant "Node.js process" as node
+
+create context
+ruby -> context : context = ExecJS.compile(initial_source)
+create node
+context -> node : spawn
+context -> node : eval(initial_source)
+
+ruby -> context : context.call(source1)
+context -> node : eval(source1)
+node -> context : result: string
+context -> ruby : result: Ruby object
+
+ruby -> context : context.call(source2)
+context -> node : eval(source2)
+node -> context : result: string
+context -> ruby : result: Ruby object
+
+@enduml

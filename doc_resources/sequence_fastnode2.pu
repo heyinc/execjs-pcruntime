@@ -1,0 +1,60 @@
+@startuml
+
+!pragma teoz true
+
+participant "User program(Thread1)" as ruby1
+participant "execjs Context1" as context1
+participant "internal object" as vm
+participant "Node.js process" as node
+participant "execjs Context2" as context2
+participant "User program(Thread2)" as ruby2
+
+create context1
+ruby1 -> context1 : context1 = ExecJS.compile(initial_source1)
+create context2
+ruby2 -> context2 : context2 = ExecJS.compile(initial_source2)
+context1 -> vm : Create Context(initial_source1)
+& context2 -> vm : Create Context(initial_source2)
+create node
+group synchronize
+    vm -> node : spawn
+    vm -> node : eval(context=1, initial_source1)
+end
+group synchronize
+    vm -> node : eval(context=2, initial_source2)
+end
+
+ruby1 -> context1 : context1.call(source1)
+& ruby2 -> context2 : context2.call(source2)
+context1 -> vm : eval(context=1, source1)
+& context2 -> vm : eval(context=2, source2)
+group synchronize
+    vm -> node : eval(context=1, source1)
+    node -> vm : result: string
+end
+vm -> context1 : result: Ruby object
+context1 -> ruby1 : result: Ruby object
+& group synchronize
+    vm -> node : eval(context=2, source2)
+    node -> vm : result: string
+end
+vm -> context2 : result: Ruby object
+context2 -> ruby2 : result: Ruby object
+
+ruby1 -> context1 : context1.call(source3)
+& ruby2 -> context2 : context2.call(source4)
+context1 -> vm : eval(context=1, source3)
+& context2 -> vm : eval(context=2, source4)
+group synchronize
+    vm -> node : eval(context=2, source4)
+    node -> vm : result: string
+end
+vm -> context2 : result: Ruby object
+context2 -> ruby2 : result: Ruby object
+& group synchronize
+    vm -> node : eval(context=1, source3)
+    node -> vm : result: string
+end
+vm -> context1 : result: Ruby object
+context1 -> ruby1 : result: Ruby object
+@enduml
