@@ -5,6 +5,7 @@ require 'tmpdir'
 require 'json'
 require 'net/protocol'
 require 'net/http'
+require 'shellwords'
 
 module ExecJS
   module PCRuntime
