@@ -158,7 +158,10 @@ module ExecJS
           request['Connection'] = 'close'
           unless content_type.nil?
             request['Content-Type'] = content_type
-            request.body = body
+            # URI.encode_www_form_component replaces space(U+0020) into '+' (not '%20')
+            # but decodeURIComponent(in JavaScript) cannot decode '+' into space
+            # so, replace '+' into '%20'
+            request.body = URI.encode_www_form_component(body).gsub('+', '%20')
           end
 
           # Net::HTTPGenericRequest#exec
@@ -172,13 +175,13 @@ module ExecJS
           end while response.is_a?(Net::HTTPContinue)
           # rubocop:enable Lint/Loop
           response.reading_body(socket, request.response_body_permitted?) {}
+          result = URI.decode_www_form_component response.body
 
           if response.code == '200'
-            result = response.body
-            ::JSON.parse(response.body, create_additions: false) if /\S/.match?(result)
+            ::JSON.parse(result, create_additions: false) if /\S/.match?(result)
           else
             # expects ErrorMessage\0StackTrace =~ response.body
-            message, stack = response.body.split "\0"
+            message, stack = result.split "\0"
             error_class = /SyntaxError:/.match?(message) ? RuntimeError : ProgramError
             error = error_class.new(message)
             error.set_backtrace(stack)
