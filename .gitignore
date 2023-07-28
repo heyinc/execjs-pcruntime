@@ -2,7 +2,7 @@
 !/.github
 !/bin
 !/lib
-!/resources
+!/doc_resources
 !/test
 !/.gitignore
 !/.rubocop.yml
