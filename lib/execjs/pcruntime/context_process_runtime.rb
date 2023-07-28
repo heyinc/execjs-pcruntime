@@ -158,7 +158,10 @@ module ExecJS
           request['Connection'] = 'close'
           unless content_type.nil?
             request['Content-Type'] = content_type
-            request.body = URI.encode_uri_component(body)
+            # URI.encode_www_form_component replaces space(U+0020) into '+' (not '%20')
+            # but decodeURIComponent(in JavaScript) cannot decode '+' into space
+            # so, replace '+' into '%20'
+            request.body = URI.encode_www_form_component(body).gsub('+', '%20')
           end
 
           # Net::HTTPGenericRequest#exec
