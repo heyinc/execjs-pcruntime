@@ -56,7 +56,8 @@ module ExecJS
         # @param [Array<String>] binary Launch command for the node(or similar JavaScript Runtime) binary,
         #     such as ['node'], ['deno', 'run'].
         # @param [String] initial_source_path Path of .js Runtime loads at startup.
-        def initialize(binary, initial_source_path)
+        def initialize(binary, initial_source_path, semaphore)
+          @semaphore = semaphore
           Dir::Tmpname.create 'execjs_pcruntime' do |path|
             # Dir::Tmpname.create rescues Errno::EEXIST and retry block
             # So, raise it if failed to create Process.
@@ -135,7 +136,12 @@ module ExecJS
         # Create a socket connected to the Process.
         # @return [Net::BufferedIO]
         def create_socket(socket_path)
+          @semaphore.pop
           Net::BufferedIO.new(UNIXSocket.new(socket_path))
+        end
+
+        def destroy_socket
+          @semaphore.push(nil)
         end
 
         # Send request to JavaScript Runtime.
@@ -187,6 +193,8 @@ module ExecJS
             error.set_backtrace(stack)
             raise error
           end
+        ensure
+          destroy_socket
         end
         # rubocop:enable Metrics/MethodLength,Metrics/AbcSize
       end
@@ -203,6 +211,8 @@ module ExecJS
         @runner_path = runner_path
         @binary = nil
         @deprecated = deprecated
+        @semaphore = Thread::Queue.new
+        100.times { @semaphore.push nil }
       end
 
       # implementation of ExecJS::Runtime#available?
@@ -218,7 +228,7 @@ module ExecJS
       # Launch JavaScript Runtime and return its handle.
       # @return [JSRuntimeHandle]
       def create_runtime_handle
-        JSRuntimeHandle.new(binary, @runner_path)
+        JSRuntimeHandle.new(binary, @runner_path, @semaphore)
       end
 
       private
