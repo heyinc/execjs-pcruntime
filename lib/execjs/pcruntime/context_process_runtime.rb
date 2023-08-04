@@ -136,12 +136,12 @@ module ExecJS
         # Create a socket connected to the Process.
         # @return [Net::BufferedIO]
         def create_socket(socket_path)
-          @semaphore.pop
+          @semaphore.acquire
           Net::BufferedIO.new(UNIXSocket.new(socket_path))
         end
 
         def destroy_socket
-          @semaphore.push(nil)
+          @semaphore.release
         end
 
         # Send request to JavaScript Runtime.
@@ -211,8 +211,7 @@ module ExecJS
         @runner_path = runner_path
         @binary = nil
         @deprecated = deprecated
-        @semaphore = Thread::Queue.new
-        100.times { @semaphore.push nil }
+        @semaphore = Semaphore.new 100
       end
 
       # implementation of ExecJS::Runtime#available?
@@ -264,6 +263,25 @@ module ExecJS
           end
         end
         nil
+      end
+    end
+
+    # Semaphore
+    class Semaphore
+      # implemented with Thread::Queue
+      # since faster than Concurrent::Semaphore and Mutex+ConditionVariable
+      # @param [Integer] limit
+      def initialize(limit)
+        @queue = Thread::Queue.new
+        limit.times { @queue.push nil }
+      end
+
+      def acquire
+        @queue.pop
+      end
+
+      def release
+        @queue.push nil
       end
     end
   end
