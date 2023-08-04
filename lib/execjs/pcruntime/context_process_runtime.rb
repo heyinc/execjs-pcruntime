@@ -211,7 +211,9 @@ module ExecJS
         @runner_path = runner_path
         @binary = nil
         @deprecated = deprecated
-        @semaphore = Semaphore.new 100
+        # macOS limits the number of file descriptors 256,
+        # so, set semaphore limit half of it
+        @semaphore = Semaphore.new 128
       end
 
       # implementation of ExecJS::Runtime#available?
