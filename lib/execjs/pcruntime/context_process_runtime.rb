@@ -20,10 +20,7 @@ module ExecJS
           super
 
           # @type [JSRuntimeHandle]
-          @runtime = runtime.create_runtime_handle
-
-          # load initial source to Context
-          @runtime.evaluate(source.encode('UTF-8'))
+          @runtime = runtime.create_runtime_handle source.encode('UTF-8')
         end
 
         # implementation of ExecJS::Runtime::Context#eval
@@ -52,17 +49,19 @@ module ExecJS
 
       # Handle of JavaScript Runtime
       # launch Runtime by .new and finished on finalizer
+      # rubocop:disable Metrics/ClassLength
       class JSRuntimeHandle
         # @param [Array<String>] binary Launch command for the node(or similar JavaScript Runtime) binary,
         #     such as ['node'], ['deno', 'run'].
         # @param [String] initial_source_path Path of .js Runtime loads at startup.
-        def initialize(binary, initial_source_path)
-          Dir::Tmpname.create 'execjs_pcruntime' do |path|
-            # Dir::Tmpname.create rescues Errno::EEXIST and retry block
-            # So, raise it if failed to create Process.
-            @runtime_pid = create_process(path, *binary, initial_source_path) || raise(Errno::EEXIST)
-            @socket_path = path
-          end
+        def initialize(binary, initial_source_path, compile_source, semaphore)
+          @semaphore = semaphore
+          @binary = binary
+          @initial_source_path = initial_source_path
+          @compile_source = compile_source
+          @recreate_process_lock = Mutex.new
+          @runtime_pid, @socket_path = initialize_process
+          evaluate(@compile_source)
           ObjectSpace.define_finalizer(self, self.class.finalizer(@runtime_pid))
         end
 
@@ -70,7 +69,35 @@ module ExecJS
         # @param [String] source JavaScript source code
         # @return [object]
         def evaluate(source)
-          post_request(@socket_path, '/eval', 'text/javascript', source)
+          socket_path = @socket_path
+          post_request(socket_path, '/eval', 'text/javascript', source)
+        rescue RuntimeError, ProgramError => e
+          raise e
+        rescue StandardError => e
+          warn e.full_message
+          retry if socket_path != @socket_path
+          @recreate_process_lock.synchronize do
+            @runtime_pid, @socket_path = recreate_process if socket_path == @socket_path
+          end
+          retry
+        end
+
+        # kill JavaScript runtime process and re-create
+        # @return [[Integer, String]] [runtime_pid, socket_path]
+        def recreate_process
+          runtime_pid = @runtime_pid
+          begin
+            err = self.class.kill_process(runtime_pid)
+            warn err.full_message unless err.nil?
+            runtime_pid, socket_path = initialize_process
+            post_request(socket_path, '/eval', 'text/javascript', @compile_source)
+          rescue RuntimeError, ProgramError => e
+            raise e
+          rescue StandardError => e
+            warn e.full_message
+            retry
+          end
+          [runtime_pid, socket_path]
         end
 
         # Create a procedure to kill the Process that has specified pid.
@@ -95,6 +122,20 @@ module ExecJS
         end
 
         private
+
+        # create temporary filename for UNIX Domain Socket and spawn JavaScript runtime process
+        # @return [[Integer, String]] [runtime_pid, socket_path]
+        def initialize_process
+          runtime_pid = 0
+          socket_path = ''
+          Dir::Tmpname.create 'execjs_pcruntime' do |path|
+            # Dir::Tmpname.create rescues Errno::EEXIST and retry block
+            # So, raise it if failed to create Process.
+            runtime_pid = create_process(path, *@binary, @initial_source_path) || raise(Errno::EEXIST)
+            socket_path = path
+          end
+          [runtime_pid, socket_path]
+        end
 
         # Attempt to execute the block several times, spacing out the attempts over a certain period.
         # @param [Integer] times maximum number of attempts
@@ -148,6 +189,7 @@ module ExecJS
         # so suppressing lint errors.
         # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
         def post_request(socket_path, path, content_type = nil, body = nil)
+          @semaphore.acquire
           socket = create_socket socket_path
 
           # timeout occurred during the test
@@ -187,9 +229,14 @@ module ExecJS
             error.set_backtrace(stack)
             raise error
           end
+        ensure
+          @semaphore.release
         end
+
         # rubocop:enable Metrics/MethodLength,Metrics/AbcSize
       end
+
+      # rubocop:enable Metrics/ClassLength
 
       attr_reader :name
 
@@ -203,6 +250,8 @@ module ExecJS
         @runner_path = runner_path
         @binary = nil
         @deprecated = deprecated
+        # limit number of threads 128 to avoid Errno::ECONNREFUSED
+        @semaphore = Semaphore.new 128
       end
 
       # implementation of ExecJS::Runtime#available?
@@ -217,8 +266,8 @@ module ExecJS
 
       # Launch JavaScript Runtime and return its handle.
       # @return [JSRuntimeHandle]
-      def create_runtime_handle
-        JSRuntimeHandle.new(binary, @runner_path)
+      def create_runtime_handle(compile_source)
+        JSRuntimeHandle.new(binary, @runner_path, compile_source, @semaphore)
       end
 
       private
@@ -254,6 +303,27 @@ module ExecJS
           end
         end
         nil
+      end
+    end
+
+    # Semaphore
+    # implemented with Thread::Queue
+    # since faster than Concurrent::Semaphore and Mutex+ConditionVariable
+    class Semaphore
+      # @param [Integer] limit
+      def initialize(limit)
+        @queue = Thread::Queue.new
+        limit.times { @queue.push nil }
+      end
+
+      # acquires 1 of permits from this semaphore, blocking until be available.
+      def acquire
+        @queue.pop
+      end
+
+      # releases 1 of permits
+      def release
+        @queue.push nil
       end
     end
   end
