@@ -250,8 +250,7 @@ module ExecJS
         @runner_path = runner_path
         @binary = nil
         @deprecated = deprecated
-        # macOS limits the number of file descriptors 256,
-        # so, set semaphore limit half of it
+        # limit number of threads 128 to avoid Errno::ECONNREFUSED
         @semaphore = Semaphore.new 128
       end
 
