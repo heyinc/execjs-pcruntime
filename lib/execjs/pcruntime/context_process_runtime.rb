@@ -59,7 +59,7 @@ module ExecJS
           @initial_source_path = initial_source_path
           @compile_source = compile_source
           @recreate_process_lock = Mutex.new
-          initialize_socket
+          @runtime_pid, @socket_path = initialize_socket
           evaluate(@compile_source)
           ObjectSpace.define_finalizer(self, self.class.finalizer(@runtime_pid))
         end
@@ -70,19 +70,27 @@ module ExecJS
         def evaluate(source)
           socket_path = @socket_path
           post_request(socket_path, '/eval', 'text/javascript', source)
-        rescue RuntimeError => e
-          raise e
-        rescue ProgramError => e
+        rescue RuntimeError, ProgramError => e
           raise e
         rescue StandardError => e
           warn e.full_message
           retry if socket_path != @socket_path
           @recreate_process_lock.synchronize do
             if socket_path == @socket_path
-              err = self.class.kill_process(@runtime_pid)
-              warn err.full_message unless err.nil?
-              initialize_socket
-              post_request(@socket_path, '/eval', 'text/javascript', @compile_source)
+              runtime_pid = @runtime_pid
+              begin
+                err = self.class.kill_process(runtime_pid)
+                warn err.full_message unless err.nil?
+                runtime_pid, socket_path = initialize_socket
+                post_request(socket_path, '/eval', 'text/javascript', @compile_source)
+              rescue RuntimeError, ProgramError => e
+                raise e
+              rescue StandardError => e
+                warn e.full_message
+                retry
+              end
+              @runtime_pid = runtime_pid
+              @socket_path = socket_path
             end
           end
           retry
@@ -112,12 +120,15 @@ module ExecJS
         private
 
         def initialize_socket
+          runtime_pid = 0
+          socket_path = ''
           Dir::Tmpname.create 'execjs_pcruntime' do |path|
             # Dir::Tmpname.create rescues Errno::EEXIST and retry block
             # So, raise it if failed to create Process.
-            @runtime_pid = create_process(path, *@binary, @initial_source_path) || raise(Errno::EEXIST)
-            @socket_path = path
+            runtime_pid = create_process(path, *@binary, @initial_source_path) || raise(Errno::EEXIST)
+            socket_path = path
           end
+          [runtime_pid, socket_path]
         end
 
         # Attempt to execute the block several times, spacing out the attempts over a certain period.
@@ -219,6 +230,7 @@ module ExecJS
         ensure
           destroy_socket
         end
+
         # rubocop:enable Metrics/MethodLength,Metrics/AbcSize
       end
 
