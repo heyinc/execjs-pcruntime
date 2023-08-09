@@ -49,6 +49,7 @@ module ExecJS
 
       # Handle of JavaScript Runtime
       # launch Runtime by .new and finished on finalizer
+      # rubocop:disable Metrics/ClassLength
       class JSRuntimeHandle
         # @param [Array<String>] binary Launch command for the node(or similar JavaScript Runtime) binary,
         #     such as ['node'], ['deno', 'run'].
@@ -59,7 +60,7 @@ module ExecJS
           @initial_source_path = initial_source_path
           @compile_source = compile_source
           @recreate_process_lock = Mutex.new
-          @runtime_pid, @socket_path = initialize_socket
+          @runtime_pid, @socket_path = initialize_process
           evaluate(@compile_source)
           ObjectSpace.define_finalizer(self, self.class.finalizer(@runtime_pid))
         end
@@ -76,24 +77,27 @@ module ExecJS
           warn e.full_message
           retry if socket_path != @socket_path
           @recreate_process_lock.synchronize do
-            if socket_path == @socket_path
-              runtime_pid = @runtime_pid
-              begin
-                err = self.class.kill_process(runtime_pid)
-                warn err.full_message unless err.nil?
-                runtime_pid, socket_path = initialize_socket
-                post_request(socket_path, '/eval', 'text/javascript', @compile_source)
-              rescue RuntimeError, ProgramError => e
-                raise e
-              rescue StandardError => e
-                warn e.full_message
-                retry
-              end
-              @runtime_pid = runtime_pid
-              @socket_path = socket_path
-            end
+            @runtime_pid, @socket_path = recreate_process if socket_path == @socket_path
           end
           retry
+        end
+
+        # kill JavaScript runtime process and re-create
+        # @return [[Integer, String]] [runtime_pid, socket_path]
+        def recreate_process
+          runtime_pid = @runtime_pid
+          begin
+            err = self.class.kill_process(runtime_pid)
+            warn err.full_message unless err.nil?
+            runtime_pid, socket_path = initialize_process
+            post_request(socket_path, '/eval', 'text/javascript', @compile_source)
+          rescue RuntimeError, ProgramError => e
+            raise e
+          rescue StandardError => e
+            warn e.full_message
+            retry
+          end
+          [runtime_pid, socket_path]
         end
 
         # Create a procedure to kill the Process that has specified pid.
@@ -119,7 +123,9 @@ module ExecJS
 
         private
 
-        def initialize_socket
+        # create temporary filename for UNIX Domain Socket and spawn JavaScript runtime process
+        # @return [[Integer, String]] [runtime_pid, socket_path]
+        def initialize_process
           runtime_pid = 0
           socket_path = ''
           Dir::Tmpname.create 'execjs_pcruntime' do |path|
@@ -170,12 +176,7 @@ module ExecJS
         # Create a socket connected to the Process.
         # @return [Net::BufferedIO]
         def create_socket(socket_path)
-          @semaphore.acquire
           Net::BufferedIO.new(UNIXSocket.new(socket_path))
-        end
-
-        def destroy_socket
-          @semaphore.release
         end
 
         # Send request to JavaScript Runtime.
@@ -188,6 +189,7 @@ module ExecJS
         # so suppressing lint errors.
         # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
         def post_request(socket_path, path, content_type = nil, body = nil)
+          @semaphore.acquire
           socket = create_socket socket_path
 
           # timeout occurred during the test
@@ -228,11 +230,13 @@ module ExecJS
             raise error
           end
         ensure
-          destroy_socket
+          @semaphore.release
         end
 
         # rubocop:enable Metrics/MethodLength,Metrics/AbcSize
       end
+
+      # rubocop:enable Metrics/ClassLength
 
       attr_reader :name
 
@@ -304,19 +308,21 @@ module ExecJS
     end
 
     # Semaphore
+    # implemented with Thread::Queue
+    # since faster than Concurrent::Semaphore and Mutex+ConditionVariable
     class Semaphore
-      # implemented with Thread::Queue
-      # since faster than Concurrent::Semaphore and Mutex+ConditionVariable
       # @param [Integer] limit
       def initialize(limit)
         @queue = Thread::Queue.new
         limit.times { @queue.push nil }
       end
 
+      # acquires 1 of permits from this semaphore, blocking until be available.
       def acquire
         @queue.pop
       end
 
+      # releases 1 of permits
       def release
         @queue.push nil
       end
