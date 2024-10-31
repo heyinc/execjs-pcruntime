@@ -197,6 +197,7 @@ module ExecJS
           socket.write_timeout *= 100
 
           request = Net::HTTP::Post.new(path)
+          request['Host'] = 'localhost'
           request['Connection'] = 'close'
           unless content_type.nil?
             request['Content-Type'] = content_type
