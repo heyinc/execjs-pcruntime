@@ -15,13 +15,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: flatt-security/setup-takumi-guard-rubygems@v1
-        with:
-          bot-id: "${{ vars.TAKUMI_GUARD_BOT_ID }}"
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4'
+      - uses: flatt-security/setup-takumi-guard-rubygems@v1
+        with:
+          bot-id: "${{ vars.TAKUMI_GUARD_BOT_ID }}"
       - name: Install dependencies
         run: bundle install
       - name: Run RuboCop

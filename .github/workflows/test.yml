@@ -20,13 +20,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: flatt-security/setup-takumi-guard-rubygems@v1
-        with:
-          bot-id: "${{ vars.TAKUMI_GUARD_BOT_ID }}"
       - name: Set up Ruby ${{ matrix.ruby-version }}
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby-version }}
+      - uses: flatt-security/setup-takumi-guard-rubygems@v1
+        with:
+          bot-id: "${{ vars.TAKUMI_GUARD_BOT_ID }}"
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
