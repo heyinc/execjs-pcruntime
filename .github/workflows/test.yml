@@ -10,6 +10,8 @@ jobs:
   test:
 
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
 
     strategy:
       matrix:
@@ -18,6 +20,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: flatt-security/setup-takumi-guard-rubygems@v1
+        with:
+          bot-id: "${{ vars.TAKUMI_GUARD_BOT_ID }}"
       - name: Set up Ruby ${{ matrix.ruby-version }}
         uses: ruby/setup-ruby@v1
         with:
