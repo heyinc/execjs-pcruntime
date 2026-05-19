@@ -20,18 +20,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Ruby ${{ matrix.ruby-version }}
-        uses: ruby/setup-ruby@v1
+      - uses: heyinc/setup-ruby-with-takumi-guard@v1
         with:
+          working-directory: .
+          bot-id: ${{ vars.TAKUMI_GUARD_BOT_ID }}
           ruby-version: ${{ matrix.ruby-version }}
-      - uses: flatt-security/setup-takumi-guard-rubygems@v1
-        with:
-          bot-id: "${{ vars.TAKUMI_GUARD_BOT_ID }}"
+          cache-key-extra: node-${{ matrix.node-version }}
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Install dependencies
-        run: bundle install
       - name: Run tests
         run: bundle exec rake
