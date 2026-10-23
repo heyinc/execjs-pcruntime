@@ -221,7 +221,7 @@ module ExecJS
           result = URI.decode_www_form_component response.body
 
           if response.code == '200'
-            ::JSON.parse(result, create_additions: false) if /\S/.match?(result)
+            ::JSON.parse(result) if /\S/.match?(result)
           else
             # expects ErrorMessage\0StackTrace =~ response.body
             message, stack = result.split "\0"
