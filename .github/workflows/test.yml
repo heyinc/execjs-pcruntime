@@ -17,13 +17,13 @@ jobs:
         node-version: ['22', '24', '26']
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3.7.0
       - name: Set up Ruby ${{ matrix.ruby-version }}
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@v1.335.0
         with:
           ruby-version: ${{ matrix.ruby-version }}
       - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.4.0
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
